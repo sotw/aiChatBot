@@ -86,8 +86,8 @@ def send():
  
 
 base = Tk()
-base.title("MediaTek A.I. CPL")
-base.geometry("600x900")
+base.title("Abyss of Humanity")
+base.geometry("600x800")
 base.resizable(width=True, height=True)
 
 #Create Chat window
@@ -110,9 +110,9 @@ EntryBox = Text(base, bd=0, bg="white",width="29", height="5", font="Arial")
 
 
 #Place all components on the screen
-scrollbar.place(x=576,y=6, height=786)
-ChatLog.place(x=6,y=6, height=786, width=570)
-EntryBox.place(x=318, y=801, height=90, width=258)
-SendButton.place(x=6, y=801, height=90)
+scrollbar.place(x=576,y=6, height=686)
+ChatLog.place(x=6,y=6, height=686, width=570)
+EntryBox.place(x=318, y=701, height=90, width=258)
+SendButton.place(x=6, y=701, height=90)
 
 base.mainloop()

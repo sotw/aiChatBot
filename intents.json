@@ -69,14 +69,9 @@
          "responses": ["Loading hospital details"],
          "context": [""]
         },
-        {"tag": "Panther",
-         "patterns": ["AX6000","Panther"],
-         "responses": ["What you want to know about AX6000? Download SDK? or WIFI Driver?"],
-         "context": [""]
-        },
-        {"tag": "Cheetah",
-         "patterns": ["AX3000","Cheetah"],
-         "responses": ["What you want to know about AX3000? Download SDK? or WIFI Driver?"],
+        {"tag": "doom",
+         "patterns": ["doom","doomed","helpless"],
+         "responses": ["Yap, I agree with you. Human is doomed"],
          "context": [""]
         }
    ]
