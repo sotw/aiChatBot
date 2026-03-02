@@ -1,2 +1,6 @@
 venv/*
 *.h5
+chatbot_data.db
+label_map.pkl
+warehouse/
+word2vec-google-news-300.gz
