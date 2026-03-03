@@ -7,12 +7,15 @@ import jieba
 import re
 from gensim.models import KeyedVectors
 from tensorflow.keras.models import load_model
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # --- 1. CONFIGURATION ---
 W2V_PATH = 'cjk_english_300.bin'
 MODEL_PATH = 'chatbot_brain.h5'
 LABEL_MAP_PATH = 'label_map.pkl'
 DB_NAME = 'chatbot_data.db'
+
 
 print("Initializing Chatbot... (Loading 300-dim Word2Vec)")
 # Loading the Google News model
@@ -22,6 +25,9 @@ print("Loading Neural Network and Labels...")
 model = load_model(MODEL_PATH)
 with open(LABEL_MAP_PATH, 'rb') as f:
     unique_labels = pickle.load(f)
+
+with open('tokenizer.pickle', 'rb') as handle:
+    tokenizer = pickle.load(handle)
 
 # Initialize MeCab once (Global)
 # -Owakati tells MeCab to return only the separated words
@@ -74,22 +80,29 @@ def get_sql_response(tag):
 # --- 4. THE CHAT LOOP ---
 print("\n--- BOT IS ONLINE! (Type 'quit' to stop) ---")
 
+
+
 while True:
     user_input = input("You: ")
     if user_input.lower() == 'quit':
         break
         
-    # Process text
-    vec = get_sentence_vector(user_input)
-    prediction_input = np.array([vec]) # Shape (1, 300)
-    
-    # Predict
-    prediction = model.predict(prediction_input, verbose=0)
+# --- 1. PREPARE TEXT INPUT ---
+# Convert text to integers based on the tokenizer used during training
+    seq = tokenizer.texts_to_sequences([user_input])
+# Ensure it is exactly the same length (20) as your model's input_length
+    padded_seq = pad_sequences(seq, maxlen=20) 
+
+# --- 2. PREDICT ---
+# We pass a list [text_input, user_input] to match the Functional API
+    prediction = model.predict([padded_seq], verbose=0)
+
+# --- 4. EXTRACT RESULTS ---
     results_index = np.argmax(prediction)
     tag = unique_labels[results_index]
-    confidence = prediction[0][results_index]
 
-    # Output Logic
+    confidence = prediction[0][results_index]    # Output Logic
+
     if confidence > 0.85:
         response = get_sql_response(tag)
         print(f"Bot: {response}")

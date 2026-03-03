@@ -1,6 +1,51 @@
-import sqlite3
+import sqlite3,re
+from deep_translator import GoogleTranslator
 
 DB_NAME = 'chatbot_data.db'
+
+def translate_enhance_flow():
+    print("\n--- Starting Translation Enhancement ---")
+    print("This will generate Japanese and Traditional Chinese patterns for all intents...")
+    
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    
+    # 1. Fetch all intents and their existing patterns
+    cursor.execute("SELECT id, tag FROM intents")
+    intents = cursor.fetchall()
+    
+    translator_ja = GoogleTranslator(source='en', target='ja')
+    translator_zh = GoogleTranslator(source='en', target='zh-TW')
+    
+    added_count = 0
+    
+    for intent_id, tag in intents:
+        print(f"Processing tag: {tag}...")
+        
+        # Get existing English patterns for this intent
+        cursor.execute("SELECT pattern_text FROM patterns WHERE intent_id=?", (intent_id,))
+        existing_patterns = [row[0] for row in cursor.fetchall()]
+        
+        new_translations = []
+        for p in existing_patterns:
+            # We skip translating if the pattern is already CJK to avoid double-translation
+            if not re.search(r'[\u4e00-\u9fff\u3040-\u30ff]', p):
+                try:
+                    ja_text = translator_ja.translate(p)
+                    zh_text = translator_zh.translate(p)
+                    new_translations.extend([ja_text, zh_text])
+                except Exception as e:
+                    print(f"  Error translating '{p}': {e}")
+
+        # 2. Insert new patterns (avoiding duplicates)
+        for t_text in set(new_translations):
+            if t_text not in existing_patterns:
+                cursor.execute("INSERT INTO patterns (intent_id, pattern_text) VALUES (?, ?)", (intent_id, t_text))
+                added_count += 1
+                
+    conn.commit()
+    conn.close()
+    print(f"\nSuccess! Added {added_count} new multilingual patterns to the database.")
 
 def setup_database():
     conn = sqlite3.connect('chatbot_data.db')
@@ -35,7 +80,8 @@ def menu():
         print("2. View All Intents")
         print("3. Add New Intent (Tag, Patterns, Responses)")
         print("4. Delete an Intent")
-        print("5. Exit")
+        print("5. Translation Enhancement (Auto-generate CJK patterns)")
+        print("6. Exit")
         
         choice = input("\nSelect an option: ")
         
@@ -48,6 +94,8 @@ def menu():
         elif choice == '4':
             delete_intent_flow()
         elif choice == '5':
+            translate_enhance_flow()
+        elif choice == '6':
             break
         else:
             print("Invalid choice, try again.")

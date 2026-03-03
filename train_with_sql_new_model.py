@@ -6,6 +6,8 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Dropout, LSTM, Embedding, SpatialDropout1D
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.utils import to_categorical
+from tensorflow.keras.preprocessing.text import Tokenizer
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # --- 1. SETTINGS & LOADING ---
 W2V_PATH = 'cjk_english_300.bin'
@@ -33,26 +35,34 @@ label_map = {label: i for i, label in enumerate(unique_labels)}
 with open('label_map.pkl', 'wb') as f:
     pickle.dump(unique_labels, f)
 
-# --- 3. VECTORIZATION ---
-def get_vector(text):
-    words = text.lower().split()
-    vectors = [w2v[w] for w in words if w in w2v]
-    return np.mean(vectors, axis=0) if vectors else np.zeros(300)
+# --- 3. Tokenizer
+# 3-1. Fit the tokenizer on your text patterns
+tokenizer = Tokenizer()
+tokenizer.fit_on_texts(patterns)
 
-train_x = np.array([get_vector(p) for p in patterns])
+# 3-2. Convert text to sequences of numbers (e.g., "hello" -> 5)
+sequences = tokenizer.texts_to_sequences(patterns)
+
+# 3-3. Pad sequences so they are all exactly 20 words long
+train_x = pad_sequences(sequences, maxlen=20)
 train_y = to_categorical([label_map[t] for t in tags])
+# 3-4. Define vocab_size (Total unique words + 1 for padding)
+vocab_size = len(tokenizer.word_index) + 1
 
 # --- 4. BUILD & TRAIN MODEL ---
 model = Sequential([
-    Dense(128, input_shape=(300,), activation='relu'),
-    Dropout(0.5),
-    Dense(64, activation='relu'),
-    Dropout(0.5),
+    # vocab_size is now the count from your tokenizer
+    Embedding(input_dim=vocab_size, output_dim=128, input_length=20),
+    SpatialDropout1D(0.2),
+    LSTM(64, dropout=0.2, recurrent_dropout=0.2),
     Dense(len(unique_labels), activation='softmax')
 ])
 
 model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-model.fit(train_x, train_y, epochs=200, batch_size=5, verbose=1)
+model.fit(train_x, train_y, epochs=200, batch_size=5)
 
 model.save('chatbot_brain.h5')
+
+with open('tokenizer.pickle', 'wb') as handle:
+    pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
 print("Training Complete. Model and Label Map saved!")
