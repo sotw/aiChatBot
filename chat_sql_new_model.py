@@ -9,13 +9,17 @@ from gensim.models import KeyedVectors
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from deep_translator import GoogleTranslator
 
+G_SPEAK_LANG = 'en'
 # --- 1. CONFIGURATION ---
 W2V_PATH = 'cjk_english_300.bin'
 MODEL_PATH = 'chatbot_brain.h5'
 LABEL_MAP_PATH = 'label_map.pkl'
 DB_NAME = 'chatbot_data.db'
 
+translator_ja = GoogleTranslator(source='en', target='ja')
+translator_zh = GoogleTranslator(source='en', target='zh-TW')
 
 print("Initializing Chatbot... (Loading 300-dim Word2Vec)")
 # Loading the Google News model
@@ -80,13 +84,16 @@ def get_sql_response(tag):
 # --- 4. THE CHAT LOOP ---
 print("\n--- BOT IS ONLINE! (Type 'quit' to stop) ---")
 
-
-
 while True:
     user_input = input("You: ")
     if user_input.lower() == 'quit':
         break
-        
+    elif user_input.lower() == 'speak english':
+       G_SPEAK_LANG = 'en'
+    elif user_input.lower() == 'speak chinese':
+       G_SPEAK_LANG = 'zh'
+    elif user_input.lower() == 'speak japanese':
+       G_SPEAK_LANG = 'ja'
 # --- 1. PREPARE TEXT INPUT ---
 # Convert text to integers based on the tokenizer used during training
     seq = tokenizer.texts_to_sequences([user_input])
@@ -95,7 +102,7 @@ while True:
 
 # --- 2. PREDICT ---
 # We pass a list [text_input, user_input] to match the Functional API
-    prediction = model.predict([padded_seq], verbose=0)
+    prediction = model.predict(np.array(padded_seq), verbose=0)
 
 # --- 4. EXTRACT RESULTS ---
     results_index = np.argmax(prediction)
@@ -103,8 +110,13 @@ while True:
 
     confidence = prediction[0][results_index]    # Output Logic
 
-    if confidence > 0.85:
+    if confidence > 0.5:
         response = get_sql_response(tag)
+        if G_SPEAK_LANG == 'zh':
+            response = translator_zh.translate(response)
+        elif G_SPEAK_LANG == 'ja':
+            response = translator_ja.translate(response)
+
         print(f"Bot: {response}")
     else:
         print("Bot: I'm not quite sure. Could you try asking in a different way?")
