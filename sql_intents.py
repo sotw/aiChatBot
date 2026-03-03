@@ -12,64 +12,92 @@ IDIOM_MAP = {
     # Add more as needed
 }
 
+import sqlite3
+import re
+from deep_translator import GoogleTranslator
+
 def translate_enhance_flow():
     print("\n--- Starting Translation Enhancement (with Idiom Support) ---")
-    
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
+    # Get all intents
     cursor.execute("SELECT id, tag FROM intents")
     intents = cursor.fetchall()
 
+    # Added time-out to prevent indefinite hanging
     translator_ja = GoogleTranslator(source='en', target='ja')
     translator_zh = GoogleTranslator(source='en', target='zh-TW')
 
     added_count = 0
 
     for intent_id, tag in intents:
+        # Fetch existing patterns to check for duplicates
         cursor.execute("SELECT pattern_text FROM patterns WHERE intent_id=?", (intent_id,))
         existing_patterns = [row[0] for row in cursor.fetchall()]
 
         new_translations = []
+        
         for p in existing_patterns:
-            # Skip CJK characters to avoid double-translation
+            # Skip if it's already CJK (Japanese/Chinese characters)
             if not re.search(r'[\u4e00-\u9fff\u3040-\u30ff]', p):
                 
-                # --- NEW: Idiom Normalization ---
-                # Check if the pattern (lowercased) exists in our idiom map
                 clean_p = p.lower().strip()
-                translation_input = IDIOM_MAP.get(clean_p, p) 
-                
+                translation_input = IDIOM_MAP.get(clean_p, p)
+
                 try:
+                    # Provide feedback so you know the script is alive
+                    print(f"  [Translating] '{p}'...", end="\r") 
+                    
                     ja_text = translator_ja.translate(translation_input)
                     zh_text = translator_zh.translate(translation_input)
-                    new_translations.extend([ja_text, zh_text])
+                    
+                    if ja_text: new_translations.append(ja_text)
+                    if zh_text: new_translations.append(zh_text)
+                    
                 except Exception as e:
-                    print(f"  Error translating '{p}': {e}")
+                    print(f"\n  [!] Error translating '{p}': {e}")
+                    continue # Move to the next pattern instead of crashing
 
+        # Insert new patterns, avoiding duplicates
         for t_text in set(new_translations):
-            if t_text not in existing_patterns:
-                cursor.execute("INSERT INTO patterns (intent_id, pattern_text) VALUES (?, ?)", (intent_id, t_text))
+            if t_text and t_text not in existing_patterns:
+                cursor.execute(
+                    "INSERT INTO patterns (intent_id, pattern_text) VALUES (?, ?)", 
+                    (intent_id, t_text)
+                )
                 added_count += 1
 
     conn.commit()
     conn.close()
-    print(f"\nSuccess! Added {added_count} new patterns (idioms handled).")
+    print(f"\n\nSuccess! Added {added_count} new patterns (idioms handled).")
 
 def setup_database():
     conn = sqlite3.connect('chatbot_data.db')
     cursor = conn.cursor()
-    
-    # Table for the Intent Tags and their Responses
+
+    # 1. Create/Update the intents table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS intents (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tag TEXT UNIQUE,
-            responses TEXT  -- We'll store responses as a pipe-separated string
+            responses TEXT,
+            action TEXT,      -- New Column
+            parameter TEXT    -- New Column
         )
     ''')
+
+    # 2. Migration: Add columns if they don't exist in an old database
+    cursor.execute("PRAGMA table_info(intents)")
+    columns = [column[1] for column in cursor.fetchall()]
     
-    # Table for the training patterns linked to an intent
+    if 'action' not in columns:
+        cursor.execute('ALTER TABLE intents ADD COLUMN action TEXT')
+    if 'parameter' not in columns:
+        cursor.execute('ALTER TABLE intents ADD COLUMN parameter TEXT')
+
+    # 3. Create/Update the patterns table (remains the same)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS patterns (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -78,9 +106,10 @@ def setup_database():
             FOREIGN KEY (intent_id) REFERENCES intents (id)
         )
     ''')
-    
+
     conn.commit()
     conn.close()
+    print("Database synced successfully.")
 
 def menu():
     while True:
@@ -112,41 +141,77 @@ def menu():
 def view_intents():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, tag, responses FROM intents")
-    rows = cursor.fetchall()
     
+    # 1. Update query to include new columns: action and parameter
+    cursor.execute("SELECT id, tag, responses, action, parameter FROM intents")
+    rows = cursor.fetchall()
+
     if not rows:
         print("\n[!] The database is empty.")
     else:
+        print("\n--- Current Chatbot Intents ---")
         for row in rows:
-            print(f"\nID: {row[0]} | TAG: {row[1]}")
-            # Get patterns for this intent
-            cursor.execute("SELECT pattern_text FROM patterns WHERE intent_id=?", (row[0],))
+            intent_id, tag, responses, action, parameter = row
+            
+            print(f"\nID: {intent_id} | TAG: {tag.upper()}")
+            
+            # 2. Get patterns for this intent
+            cursor.execute("SELECT pattern_text FROM patterns WHERE intent_id=?", (intent_id,))
             patterns = [p[0] for p in cursor.fetchall()]
-            print(f"Patterns: {', '.join(patterns)}")
-            print(f"Responses: {row[2].replace('|', ' / ')}")
+            
+            print(f"  > Patterns:  {', '.join(patterns)}")
+            print(f"  > Responses: {responses.replace('|', ' / ')}")
+            
+            # 3. Display Action/Parameter only if they exist
+            if action:
+                print(f"  [*] ACTION:    {action}")
+            if parameter:
+                print(f"  [*] PARAMETER: {parameter}")
+                
+        print("\n" + "-"*30)
+    
     conn.close()
 
 def add_intent_flow():
-    tag = input("Enter intent tag (e.g., 'greeting'): ").strip().lower()
+    tag = input("Enter intent tag (e.g., 'get_weather'): ").strip().lower()
     patterns_raw = input("Enter patterns separated by commas: ")
     responses_raw = input("Enter responses separated by commas: ")
     
-    patterns = [p.strip() for p in patterns_raw.split(',')]
-    responses = [r.strip() for r in responses_raw.split(',')]
-    
+    # New prompts for the added columns
+    action = input("Enter action name (press Enter if none): ").strip() or None
+    parameter = input("Enter parameter (press Enter if none): ").strip() or None
+
+    patterns = [p.strip() for p in patterns_raw.split(',') if p.strip()]
+    responses = [r.strip() for r in responses_raw.split(',') if r.strip()]
+
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+    
     try:
-        cursor.execute("INSERT INTO intents (tag, responses) VALUES (?, ?)", (tag, "|".join(responses)))
+        # 1. Insert into intents table including action and parameter
+        cursor.execute(
+            "INSERT INTO intents (tag, responses, action, parameter) VALUES (?, ?, ?, ?)", 
+            (tag, "|".join(responses), action, parameter)
+        )
+        
         intent_id = cursor.lastrowid
+        
+        # 2. Insert the patterns linked to the new intent_id
         for p in patterns:
-            cursor.execute("INSERT INTO patterns (intent_id, pattern_text) VALUES (?, ?)", (intent_id, p))
+            cursor.execute(
+                "INSERT INTO patterns (intent_id, pattern_text) VALUES (?, ?)", 
+                (intent_id, p)
+            )
+            
         conn.commit()
-        print(f"Successfully added '{tag}'!")
+        print(f"\nSuccessfully added '{tag}' with action '{action}'!")
+        
     except sqlite3.IntegrityError:
-        print(f"Error: Tag '{tag}' already exists.")
-    conn.close()
+        print(f"\nError: Tag '{tag}' already exists in the database.")
+    except Exception as e:
+        print(f"\nAn error occurred: {e}")
+    finally:
+        conn.close()
 
 def delete_intent_flow():
     tag = input("Enter the tag name you want to delete: ").strip().lower()

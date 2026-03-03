@@ -11,6 +11,7 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from deep_translator import GoogleTranslator
 
+global G_SPEAK_LANG
 G_SPEAK_LANG = 'en'
 # --- 1. CONFIGURATION ---
 W2V_PATH = 'cjk_english_300.bin'
@@ -66,6 +67,22 @@ def get_sentence_vector(text):
         
     return np.mean(vectors, axis=0)
 
+def bot_action(action, parameters):
+    global G_SPEAK_LANG
+    if action == None:
+        return
+    if action == "set":
+        paras = parameters.split()
+        if len(paras) == 0:
+            return
+        if paras[0] == 'language':
+            if paras[1] == 'english':
+                G_SPEAK_LANG = 'en'
+            elif paras[1] == 'chinese':
+                G_SPEAK_LANG = 'zh'
+            elif paras[1] == 'japanese':
+                G_SPEAK_LANG = 'ja'
+
 # --- 3. THE SQL RESPONSE FETCH ---
 def get_sql_response(tag):
     conn = sqlite3.connect(DB_NAME)
@@ -81,6 +98,38 @@ def get_sql_response(tag):
         return random.choice(responses_list)
     return "I found the intent, but no response was defined in the database."
 
+def get_sql_action(tag):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    # Fetch responses for the predicted tag
+    cursor.execute("SELECT action FROM intents WHERE tag=?", (tag,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if len(row)==0 or row == None:
+        return None
+    if row:
+        if row[0] != None:
+            actions_list = row[0].split('|')
+            return actions_list[0]
+    return None
+
+def get_sql_para(tag):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    # Fetch responses for the predicted tag
+    cursor.execute("SELECT parameter FROM intents WHERE tag=?", (tag,))
+    row = cursor.fetchone()
+    conn.close()
+    
+    if len(row)==0 or row == None:
+        return None
+    if row:
+        if row[0] != None:
+            para_list = row[0].split('|')
+            return para_list[0]
+    return None
+
 # --- 4. THE CHAT LOOP ---
 print("\n--- BOT IS ONLINE! (Type 'quit' to stop) ---")
 
@@ -88,12 +137,7 @@ while True:
     user_input = input("You: ")
     if user_input.lower() == 'quit':
         break
-    elif user_input.lower() == 'speak english':
-       G_SPEAK_LANG = 'en'
-    elif user_input.lower() == 'speak chinese':
-       G_SPEAK_LANG = 'zh'
-    elif user_input.lower() == 'speak japanese':
-       G_SPEAK_LANG = 'ja'
+
 # --- 1. PREPARE TEXT INPUT ---
 # Convert text to integers based on the tokenizer used during training
     seq = tokenizer.texts_to_sequences([user_input])
@@ -112,6 +156,10 @@ while True:
 
     if confidence > 0.85:
         response = get_sql_response(tag)
+        action = get_sql_action(tag)
+        paras = get_sql_para(tag)
+        if action!=None and paras != None:
+            bot_action(action, paras)
         if G_SPEAK_LANG == 'zh':
             response = translator_zh.translate(response)
         elif G_SPEAK_LANG == 'ja':
