@@ -110,7 +110,7 @@ while True:
 
     confidence = prediction[0][results_index]    # Output Logic
 
-    if confidence > 0.5:
+    if confidence > 0.85:
         response = get_sql_response(tag)
         if G_SPEAK_LANG == 'zh':
             response = translator_zh.translate(response)
@@ -119,4 +119,9 @@ while True:
 
         print(f"Bot: {response}")
     else:
-        print("Bot: I'm not quite sure. Could you try asking in a different way?")
+        response = f"Bot: I'm not quite sure about:{user_input}. Could you try asking in a different way?"
+        if G_SPEAK_LANG == 'zh':
+            response = translator_zh.translate(response)
+        elif G_SPEAK_LANG == 'ja':
+            response = translator_ja.translate(response)
+        print(response)
