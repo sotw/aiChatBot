@@ -13,7 +13,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 W2V_PATH = 'cjk_english_300.bin'
 DB_NAME = 'chatbot_data.db'
 
-print("Loading Google News Model (this may take a minute)...")
+print("Loading Model (this may take a minute)...")
 # limit=200000 speeds up loading while keeping the most common words
 w2v = KeyedVectors.load_word2vec_format(W2V_PATH, binary=True, limit=200000)
 
