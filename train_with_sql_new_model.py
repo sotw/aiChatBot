@@ -11,6 +11,7 @@ from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.utils import to_categorical
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.utils import plot_model
 
 # Initialize Japanese Tagger
 tagger = Tagger('-Owakati')
@@ -113,3 +114,14 @@ model.save('chatbot_brain.h5')
 with open('tokenizer.pickle', 'wb') as handle:
     pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
 print("Training Complete. Model and Label Map saved!")
+
+plot_model(
+    model,
+    to_file='my_lstm_text_classifier.png',
+    show_shapes=True,
+    show_layer_names=True,
+    show_trainable=True,
+    show_layer_activations=True,
+    rankdir='TB',
+    dpi=160
+)

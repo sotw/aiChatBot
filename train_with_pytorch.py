@@ -9,6 +9,8 @@ import torch
 import torch.nn as nn
 import collections
 from torch.utils.data import DataLoader, TensorDataset
+from torchview import draw_graph
+from functools import partial
 
 class TextClassifier(nn.Module):
     def __init__(self, vocab_size, embedding_matrix, unique_labels_count):
@@ -84,17 +86,6 @@ print("Loading Model (this may take a minute)...")
 
 # This is nearly INSTANT and uses very little RAM because of mmap='r'
 ft_kv = KeyedVectors.load('cjk_fasttext.kv', mmap='r')
-'''
-embedding_matrix = np.zeros((vocab_size, 300))
-for word, i in tokenizer.word_index.items():
-    if word in ft_kv:
-        embedding_matrix[i] = fg_kv[word]
-    else:
-        try:
-            embeddeding_matrix[i] = ft_kv.get_vector(word)
-        except KeyError:
-            pass
-'''
 
 # --- 2. FETCH DATA FROM SQL ---
 conn = sqlite3.connect(DB_NAME)
@@ -188,3 +179,24 @@ with open('tokenizer_word_index.pkl', 'wb') as f:
 # Print first 10 items to see the format
 print("Sample keys in word_index:")
 print(list(word_index.keys())[:10])
+
+# 1. Create a dummy input (Batch size 1, Sequence length 100)
+# Use the same device as your model (CPU or CUDA)
+device = next(model.parameters()).device
+dummy_input = torch.randint(0, 10, (1, 100), dtype=torch.long).to(device)
+
+model_proxy = partial(model.__call__)
+model_proxy.training = model.training
+
+model_graph = draw_graph(
+    model, 
+    input_data=dummy_input,
+    expand_nested=True,
+    depth=2
+)
+
+model_graph.visual_graph.render("text_classifier_plot", format="png")
+
+print("Success! Check your folder for text_classifier_plot.png")
+
+
