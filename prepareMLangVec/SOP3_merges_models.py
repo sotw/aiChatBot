@@ -4,8 +4,6 @@ from scipy.linalg import orthogonal_procrustes
 from deep_translator import GoogleTranslator
 from tqdm import tqdm # For progress bar
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from deep_translator import GoogleTranslator
-from tqdm import tqdm
 
 def generate_seed_dictionary(en_model, target_vec_path, lang_code, limit=5000):
     print(f"Loading target vocabulary from {target_vec_path}...")
