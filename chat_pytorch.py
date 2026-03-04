@@ -179,7 +179,7 @@ def prepare_input(user_text, word_index, max_len=20):
     refined_words = []
     for w in words:
         refined_words.extend(jieba.lcut(w))
-# --- DEBUG START ---
+    # --- DEBUG START ---
     print(f"Tokens found: {refined_words}")
     sequence = []
     for w in refined_words:
@@ -219,20 +219,22 @@ while True:
     with torch.no_grad(): # Use no_grad to save memory and speed up
         # We call the model directly
         output = model(processed_input)
-        print(f"Raw Output (Logits): {output}") # See if all values are the same
+        # print(f"Raw Output (Logits): {output}") # See if all values are the same
         # Convert LogSoftmax back to 0-1 probability
         probs = torch.exp(output)
-        print(f"Probabilities: {probs}")
+        # print(f"Probabilities: {probs}")
         # Get the highest probability (confidence) and its index
         conf_tensor, idx_tensor = torch.max(probs, dim=1)
         
         # Convert Tensors to standard Python numbers
         confidence = conf_tensor.item()
         results_index = idx_tensor.item()
+        print(f"confidence:{confidence} index:{results_index}")
+
 
     # --- 3. EXTRACT RESULTS ---
     tag = unique_labels[results_index]
-
+    print(f"tag:{tag}")
     if confidence > 0.6:
         response = get_sql_response(tag)
         action = get_sql_action(tag)
