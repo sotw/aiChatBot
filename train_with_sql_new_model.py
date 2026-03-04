@@ -40,7 +40,7 @@ print("Loading Model (this may take a minute)...")
 
 # This is nearly INSTANT and uses very little RAM because of mmap='r'
 ft_kv = KeyedVectors.load('cjk_fasttext.kv', mmap='r')
-
+'''
 embedding_matrix = np.zeros((vocab_size, 300))
 for word, i in tokenizer.word_index.items():
     if word in ft_kv:
@@ -50,7 +50,7 @@ for word, i in tokenizer.word_index.items():
             embeddeding_matrix[i] = ft_kv.get_vector(word)
         except KeyError:
             pass
-
+'''
 
 # --- 2. FETCH DATA FROM SQL ---
 conn = sqlite3.connect(DB_NAME)
@@ -75,7 +75,7 @@ with open('label_map.pkl', 'wb') as f:
 
 segmented_patterns = [tokenize_cjk(p) for p in patterns]
 
-#tokenizer = Tokenizer()
+tokenizer = Tokenizer()
 tokenizer.fit_on_texts(segmented_patterns)
 
 # 3-2. Convert text to sequences of numbers (e.g., "hello" -> 5)
@@ -86,6 +86,17 @@ train_x = pad_sequences(sequences, maxlen=20)
 train_y = to_categorical([label_map[t] for t in tags])
 # 3-4. Define vocab_size (Total unique words + 1 for padding)
 vocab_size = len(tokenizer.word_index) + 1
+
+embedding_matrix = np.zeros((vocab_size, 300))
+for word, i in tokenizer.word_index.items():
+    try:
+        # Check if the word exists in your loaded KeyedVectors
+        embedding_matrix[i] = ft_kv[word]
+    except KeyError:
+        # Word not found, stays as zeros
+        pass
+
+
 
 # --- 4. BUILD & TRAIN MODEL ---
 model = Sequential([
@@ -100,6 +111,11 @@ model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accur
 model.fit(train_x, train_y, epochs=200, batch_size=64, verbose=1)
 
 model.save('chatbot_brain.h5')
+
+with open('tokenizer.pickle', 'wb') as handle:
+    pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
+print("Training Complete. Model and Label Map saved!")
+
 
 with open('tokenizer.pickle', 'wb') as handle:
     pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
