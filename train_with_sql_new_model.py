@@ -96,8 +96,6 @@ for word, i in tokenizer.word_index.items():
         # Word not found, stays as zeros
         pass
 
-
-
 # --- 4. BUILD & TRAIN MODEL ---
 model = Sequential([
     # vocab_size is now the count from your tokenizer
