@@ -103,7 +103,7 @@ model = Sequential([
     # vocab_size is now the count from your tokenizer
     Embedding(input_dim=vocab_size, output_dim=300, weights=[embedding_matrix],mask_zero=True,trainable=False),
     SpatialDropout1D(0.2),
-    LSTM(64, dropout=0.2),
+    LSTM(64, dropout=0.2,recurrent_dropout=0.2),
     Dense(len(unique_labels), activation='softmax')
 ])
 
@@ -111,11 +111,6 @@ model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accur
 model.fit(train_x, train_y, epochs=200, batch_size=64, verbose=1)
 
 model.save('chatbot_brain.h5')
-
-with open('tokenizer.pickle', 'wb') as handle:
-    pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)
-print("Training Complete. Model and Label Map saved!")
-
 
 with open('tokenizer.pickle', 'wb') as handle:
     pickle.dump(tokenizer, handle, protocol=pickle.HIGHEST_PROTOCOL)

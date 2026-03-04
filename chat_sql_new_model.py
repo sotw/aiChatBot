@@ -130,6 +130,42 @@ def get_sql_para(tag):
             return para_list[0]
     return None
 
+def prepare_input(user_text, tokenizer, max_len=20):
+    # 1. Use your CJK logic to add spaces (matches train side line 76)
+    # Note: Use the logic from your previous message (Fugashi + Jieba)
+    words = tagger.parse(user_text).split()
+    refined_words = []
+    for w in words:
+        refined_words.extend(jieba.lcut(w))
+    
+    # 2. Re-join into a space-separated string
+    segmented_text = " ".join(refined_words).lower().strip()
+    
+    # 3. Transform to integers (matches train side line 79)
+    # This will NO LONGER be [[]] because the words now have spaces!
+    sequence = tokenizer.texts_to_sequences([segmented_text])
+    
+    # 4. Pad (Use 'pre' to match Keras default)
+    padded = pad_sequences(sequence, maxlen=max_len, padding='pre')
+    
+    return padded
+
+def prepare_input_ori(user_text, tokenizer, max_len=20):
+    # 1. Convert text to lowercase (standard for most tokenizers)
+    user_text = user_text.lower().strip()
+    
+    # 2. Transform string to list of integers
+    # 
+    sequence = tokenizer.texts_to_sequences([user_text])
+    
+    print(f"User Text: {user_text}")
+    print(f"Sequence: {sequence}")
+    # 3. Pad with zeros at the BEGINNING (default 'pre')
+    # Since mask_zero=True, the LSTM will ignore these 0s
+    padded = pad_sequences(sequence, maxlen=max_len, padding='pre')
+    
+    return padded
+
 # --- 4. THE CHAT LOOP ---
 print("\n--- BOT IS ONLINE! (Type 'quit' to stop) ---")
 
@@ -140,13 +176,15 @@ while True:
 
 # --- 1. PREPARE TEXT INPUT ---
 # Convert text to integers based on the tokenizer used during training
-    seq = tokenizer.texts_to_sequences([user_input])
+#   seq = tokenizer.texts_to_sequences([user_input])
 # Ensure it is exactly the same length (20) as your model's input_length
-    padded_seq = pad_sequences(seq, maxlen=20) 
+#   padded_seq = pad_sequences(seq, maxlen=20) 
+    processed_input = prepare_input(user_input, tokenizer)
 
 # --- 2. PREDICT ---
 # We pass a list [text_input, user_input] to match the Functional API
-    prediction = model.predict(np.array(padded_seq), verbose=0)
+#    prediction = model.predict(np.array(padded_seq), verbose=0)
+    prediction = model.predict(processed_input, verbose=0)
 
 # --- 4. EXTRACT RESULTS ---
     results_index = np.argmax(prediction)
@@ -154,7 +192,7 @@ while True:
 
     confidence = prediction[0][results_index]    # Output Logic
 
-    if confidence > 0.85:
+    if confidence > 0.6:
         response = get_sql_response(tag)
         action = get_sql_action(tag)
         paras = get_sql_para(tag)
