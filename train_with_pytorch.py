@@ -143,7 +143,8 @@ X_tensor = torch.LongTensor(train_x_np)
 Y_tensor = torch.LongTensor(train_y_np)
 
 dataset = TensorDataset(X_tensor, Y_tensor)
-train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
+# batch_size should map to pattern size
+train_loader = DataLoader(dataset, batch_size=4, shuffle=True)
 
 # --- 4. BUILD MODEL ---
 model = TextClassifier(vocab_size, embedding_matrix, len(unique_labels))
