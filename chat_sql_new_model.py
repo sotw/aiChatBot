@@ -5,7 +5,6 @@ import random
 import MeCab
 import jieba
 import re
-from gensim.models import KeyedVectors
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
@@ -14,7 +13,6 @@ from deep_translator import GoogleTranslator
 global G_SPEAK_LANG
 G_SPEAK_LANG = 'en'
 # --- 1. CONFIGURATION ---
-W2V_PATH = 'cjk_english_300.bin'
 MODEL_PATH = 'chatbot_brain.h5'
 LABEL_MAP_PATH = 'label_map.pkl'
 DB_NAME = 'chatbot_data.db'
@@ -22,9 +20,7 @@ DB_NAME = 'chatbot_data.db'
 translator_ja = GoogleTranslator(source='en', target='ja')
 translator_zh = GoogleTranslator(source='en', target='zh-TW')
 
-print("Initializing Chatbot... (Loading 300-dim Word2Vec)")
-# Loading the Google News model
-w2v = KeyedVectors.load_word2vec_format(W2V_PATH, binary=True)
+print("Initializing Chatbot...")
 
 print("Loading Neural Network and Labels...")
 model = load_model(MODEL_PATH)
@@ -37,35 +33,6 @@ with open('tokenizer.pickle', 'rb') as handle:
 # Initialize MeCab once (Global)
 # -Owakati tells MeCab to return only the separated words
 tagger = MeCab.Tagger("-Owakati")
-
-# --- 2. THE VECTORIZER (300-dim) ---
-def get_sentence_vector(text):
-    # Detect CJK characters
-    has_chinese = re.search(r'[\u4e00-\u9fff]', text)
-    has_japanese = re.search(r'[\u3040-\u30ff]', text) # Hiragana/Katakana
-
-    if has_japanese:
-        # Use MeCab for Japanese
-        words = tagger.parse(text).strip().split()
-    elif has_chinese:
-        # Use Jieba for Chinese
-        words = list(jieba.cut(text))
-    else:
-        # Standard English splitting
-        words = text.lower().split()
-    
-    # 300-dim vector aggregation
-    vectors = [w2v[w] for w in words if w in w2v]
-    
-    if not vectors:
-        # Fallback: Character-level for CJK if word-level fails
-        if has_chinese or has_japanese:
-            vectors = [w2v[char] for char in text if char in w2v]
-            
-        if not vectors:
-            return np.zeros(300)
-        
-    return np.mean(vectors, axis=0)
 
 def bot_action(action, parameters):
     global G_SPEAK_LANG
@@ -191,8 +158,9 @@ while True:
     tag = unique_labels[results_index]
 
     confidence = prediction[0][results_index]    # Output Logic
+    print(f"confidence:{confidence}")
 
-    if confidence > 0.6:
+    if confidence > 0.3:
         response = get_sql_response(tag)
         action = get_sql_action(tag)
         paras = get_sql_para(tag)
